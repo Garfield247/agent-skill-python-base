@@ -1,55 +1,49 @@
 ---
 name: python-base
 description: >-
-  Python 3.10+ 现代基础语言核心规范、PEP 604 强类型系统、Pythonic 惯用法与数据模型技能。
-  涵盖原生类型提示 (X | Y, list[T])、可变默认参数避坑、dataclass(slots=True) 高效建模、
-  生成器流式防 OOM、异常链保留 (raise ... from err) 及 match-case 模式匹配。
+  现代 Python 核心开发规范技能。以 Python 3.10+ 为演进基调，具备完备的环境版本自适应决策机制。
+  涵盖类型系统自适应 (3.10+ 原生联合类型 vs 3.8/3.9 __future__ 降级)、默认可变参数避坑铁律、
+  高效数据模型 (@dataclass slots)、生成器流式防 OOM、异常链保留及 Pythonic 惯用法。
 ---
 
-# Python 3.10+ 现代基础语言规范技能 (Modern Python Mastery Skill)
+# 现代 Python 核心语言规范技能 (Modern Idiomatic Python Skill)
 
 ## 概述 (Overview)
 
-本技能定义了在编写**通用 Python 基础模块、纯数据结构、算法逻辑、公共工具库或领域实体对象**时的核心代码规范与现代 Pythonic 惯用法。深度吸纳 **PEP 8 / PEP 20 (Zen of Python)**、**PEP 604 现代类型系统**以及业界超快速工具链（Ruff/Mypy）的工程实践。
+本技能定义了在编写**通用 Python 基础模块、纯数据结构、算法逻辑、公共工具库或领域实体对象**时的核心规范与 Pythonic 惯用法。深刻践行 **“现代基调先行，环境自适应决策”** 的务实工程哲学。
 
 ---
 
-# 1. 现代类型系统规范 (Type Hints & PEP 604)
+# 1. 架构基调与版本自适应决策 (Version Baseline & Adaptive Matrix)
 
-全面拥抱 Python 3.10+ 语法，严禁在现代代码中残留 3.8 以前的陈旧类型导入：
+### 1.1 演进基调 (North Star Baseline)
+在新立项或无旧版本历史包袱时，**统一以 Python 3.10+ 作为现代设计基调**，充分利用原生强类型系统（PEP 604）、模式匹配与语言级性能优化。
 
-| 场景分类 | 陈旧写法 (禁止) | 现代规范 (强制) |
-| :--- | :--- | :--- |
-| **可空/联合类型** | `from typing import Optional, Union`<br/>`Optional[str]`, `Union[int, str]` | `str | None`<br/>`int | str` (PEP 604 原生语法) |
-| **通用集合容器** | `from typing import List, Dict, Set`<br/>`List[str]`, `Dict[str, Any]` | 原生容器：`list[str]`, `dict[str, Any]`, `set[int]` |
-| **可调用对象** | `Callable[[int], str]` | 导入 `from collections.abc import Callable, Sequence, Mapping, Iterator` |
-| **鸭子类型抽象** | 强制继承抽象基类 ABC | 使用 `typing.Protocol` 声明结构化子类型接口 |
+### 1.2 环境自适应感知与降级决策表 (Adaptive Sniffing & Fallback)
+在面对既有存量项目时，**第一原则是尊重当前项目的真实运行环境**（优先探测 `pyproject.toml`、`runtime.txt`、`.python-version`、`Dockerfile` 或环境变量）：
 
-### Protocol 静态结构接口范例
-```python
-from typing import Protocol
-
-class Serializable(Protocol):
-    """定义鸭子类型契约，无需显式继承"""
-    def to_dict(self) -> dict[str, any]: ...
-
-def dump_payload(obj: Serializable) -> dict[str, any]:
-    return obj.to_dict()
-```
+| 语法/特性维度 | 推荐现代基调 (Python 3.10+) | 低版本优雅降级方案 (Python 3.8 / 3.9) | 核心考量 / 避坑红线 |
+| :--- | :--- | :--- | :--- |
+| **联合类型 (Union)** | `str | None`<br/>`int | str` | **首选**：文件顶部引入 `from __future__ import annotations`<br/>**备选**：`from typing import Optional, Union`<br/>使用 `Optional[str]`, `Union[int, str]` | 严禁在 3.8/3.9 环境未导入 `__future__` 时直接使用 `|` 运算，避免 `TypeError` 崩溃。 |
+| **通用集合类型** | 原生：`list[str]`, `dict[str, Any]` | 3.9 支持原生；3.8 需使用 `from typing import List, Dict` | 避免陈旧 `typing` 容器在现代环境过度导入。 |
+| **结构模式匹配** | `match...case` | 降级为清晰字典映射分发（Dispatch Table）或结构化 `if-elif-else` | 3.10 之前的版本不支持 `match` 关键字。 |
+| **高效数据模型** | `@dataclass(slots=True)` | 3.10+ 支持 `slots=True`；3.8/3.9 降级为普通 `@dataclass` | 3.8/3.9 不支持 `slots=True` 参数。 |
 
 ---
 
 # 2. Pythonic 核心铁律与避坑防线 (Core Idioms & Anti-Patterns)
 
+无论项目处于哪种 Python 版本，以下三项铁律全版本通用且强制遵循：
+
 ### 🚨 铁律一：默认可变参数死穴 (Mutable Default Argument - 绝对红线)
 - 函数默认参数在模块加载时仅求值一次，**绝对禁止使用可变对象（列表、字典、集合）作为默认值**：
   ```python
-  # ❌ 致命错误：所有调用者将共享同一个 items 列表，导致脏数据穿透
+  # ❌ 致命错误：所有调用者共享同一个 items 列表，造成跨请求脏数据污染
   def append_item(val: str, items: list[str] = []) -> list[str]:
       items.append(val)
       return items
 
-  # ✅ 唯一正解：使用 None 并在函数体内动态初始化
+  # ✅ 唯一正解：全版本通用安全模式（使用 None 并在函数体内动态初始化）
   def append_item(val: str, items: list[str] | None = None) -> list[str]:
       target = items if items is not None else []
       target.append(val)
@@ -73,50 +67,9 @@ def dump_payload(obj: Serializable) -> dict[str, any]:
 
 ---
 
-# 3. 现代面向对象与高效数据模型 (Modern Data Modeling)
+# 3. 专属排障与静态诊断武器库 (Troubleshooting & Tooling)
 
-优先使用标准库 `@dataclass` 替代繁琐的手写 `__init__`，并开启 `slots` 节省 40% 内存：
-
-```python
-from dataclasses import dataclass, field
-from datetime import datetime
-
-@dataclass(slots=True, frozen=True)
-class UserProfile:
-    """现代只读高效数据类
-    slots=True: 禁用 __dict__，极大降低内存开销并加速属性访问
-    frozen=True: 实例只读不可变，天然线程安全并支持作为字典 Key (自动生成 __hash__)
-    """
-    user_id: int
-    username: str
-    tags: tuple[str, ...] = field(default_factory=tuple)
-    created_at: datetime = field(default_factory=datetime.now)
-```
-
----
-
-# 4. 现代模式匹配 (Pattern Matching - Python 3.10+)
-
-使用 `match...case` 取代难以维护的多层 `if-elif-else`，实现清晰的解构与分发：
-
-```python
-def handle_event(event: dict[str, any]) -> str:
-    match event:
-        case {"type": "user_login", "user_id": int(uid), "ip": str(ip)}:
-            return f"用户登录: {uid} (IP: {ip})"
-        case {"type": "order_paid", "amount": float(amt)} if amt > 10000:
-            return f"大额订单支付触发风控审核: {amt}"
-        case {"type": "order_paid", "amount": float(amt)}:
-            return f"常规订单支付: {amt}"
-        case _:
-            raise ValueError(f"未知事件类型: {event}")
-```
-
----
-
-# 5. 专属排障与静态诊断武器库 (Troubleshooting & Tooling)
-
-- **极速代码检查与格式化 (Ruff - 替代 flake8/black/isort)**：
+- **极速代码检查与格式化 (Ruff)**：
   ```bash
   ruff check . --fix
   ruff format .
@@ -137,10 +90,10 @@ def handle_event(event: dict[str, any]) -> str:
 
 ---
 
-# 6. Python 基础开发 Checklist
+# 4. Python 基础开发 Checklist
 
-- [ ] 类型注解是否全部使用 Python 3.10+ 原生语法（`str | None`，原生 `list/dict`）？
+- [ ] 是否已检查项目版本声明（`pyproject.toml` 等）并自适应匹配对应语法？
+- [ ] 若在 Python < 3.10 环境使用现代类型语法，是否在顶部显式声明了 `from __future__ import annotations`？
 - [ ] 是否存在函数默认可变参数（`[]` 或 `{}`）的致命隐患？
-- [ ] 数据模型是否开启了 `@dataclass(slots=True)` 提升内存与访问性能？
-- [ ] 抛出包装异常时是否添加了 `from err` 保留异常链？
+- [ ] 抛出包装异常时是否添加了 `from err` 保留因果链？
 - [ ] 海量数据计算是否采用了生成器流式处理？
